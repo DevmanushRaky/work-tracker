@@ -131,6 +131,7 @@ export function AuthModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogTitle>{mode === "login" ? "Login" : "Register"}</DialogTitle>
+          <DialogDescription>Enter your email and password to log in or register.</DialogDescription>
           <div className="flex justify-center mb-4">
             <Button variant={mode === "login" ? "default" : "outline"} onClick={() => setMode("login")}>Login</Button>
             <Button variant={mode === "register" ? "default" : "outline"} onClick={() => setMode("register")}>Register</Button>

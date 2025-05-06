@@ -47,8 +47,9 @@ const attendanceBadgeVariant = (attendance: string) => {
 };
 
 export default function DailyPage() {
-    const { user, token } = useAuth();
+    const { user } = useAuth();
     const router = useRouter();
+    const [openDialog, setOpenDialog] = useState<{ type: 'standup' | 'report'; index: number } | null>(null);
 
     // All hooks here, before any return!
     const [form, setForm] = useState<DailyReport>({ ...initialForm, workingHour: "" });
@@ -102,15 +103,40 @@ export default function DailyPage() {
         }));
     }, []);
 
+    // Fetch records on mount (same as monthly page logic)
     useEffect(() => {
         fetchRecords();
     }, []);
+
+    // Move fetchRecords here so it can access setRecords and setInitialLoading
+    const fetchRecords = async () => {
+        setInitialLoading(true);
+        try {
+            const res = await fetch('/api/daily', { method: 'GET' });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.records)) {
+                setRecords(data.records);
+            }
+        } catch {
+            // Optionally handle error
+        }
+        setInitialLoading(false);
+    };
 
     useEffect(() => {
         setCurrentPage(1);
     }, [filterDate, filterAttendance, filterWorkingHourMin, filterWorkingHourMax, records.length]);
 
-    if (user === null) return null;
+    if (user === null) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-100">
+                <div className="flex flex-col items-center gap-4">
+                    <span className="inline-block animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-500 border-solid"></span>
+                    <div className="text-lg text-indigo-700 font-semibold">Redirecting to login...</div>
+                </div>
+            </div>
+        );
+    }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -122,20 +148,6 @@ export default function DailyPage() {
             );
         }
         setForm(updated);
-    };
-
-    // Fetch all records
-    const fetchRecords = async () => {
-        setInitialLoading(true);
-        try {
-            console.log("Token in context:", token);
-            const res = await fetch('/api/daily', { method: 'GET' });
-            const data = await res.json();
-            if (data.success && Array.isArray(data.records)) {
-                setRecords(data.records);
-            }
-        } catch {}
-        setInitialLoading(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -293,12 +305,12 @@ export default function DailyPage() {
             <Navbar />
             {/* Toast */}
             {toast.message && (
-                <div className={`fixed right-8 top-[72px] z-50 px-4 py-2 rounded shadow-lg text-white ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>{toast.message}</div>
+                <div className={`fixed right-4 left-4 top-[72px] z-50 px-4 py-2 rounded shadow-lg text-white ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-center max-w-xs mx-auto md:right-8 md:left-auto`}>{toast.message}</div>
             )}
-            <div className="w-full max-w-[1800px] mx-auto mt-4  grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+            <div className="w-full max-w-[1800px] mx-auto mt-4 grid grid-cols-1 lg:grid-cols-4 gap-8 items-start px-2 sm:px-4 md:px-8">
                 {/* Form */}
-                <div className="lg:col-span-1">
-                    <Card className="w-full min-h-[600px] h-full p-8 rounded-2xl border shadow-md flex flex-col">
+                <div className="lg:col-span-1 w-full">
+                    <Card className="w-full min-h-[600px] h-full p-4 sm:p-8 rounded-2xl border shadow-md flex flex-col">
                         <CardHeader>
                             <CardTitle>Daily Report</CardTitle>
                             <CardDescription>Fill in your daily work details below.</CardDescription>
@@ -368,7 +380,7 @@ export default function DailyPage() {
                     </Card>
                 </div>
                 {/* Log Table */}
-                <div className="lg:col-span-3 flex flex-col h-full">
+                <div className="lg:col-span-3 flex flex-col h-full w-full">
                     <Card className="w-full min-h-[600px] h-full flex flex-col flex-1 rounded-2xl border bg-white/80 shadow-lg">
                         <CardHeader className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-4">
                             <div>
@@ -408,8 +420,8 @@ export default function DailyPage() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-0 flex-1 flex flex-col">
-                            <div className="overflow-x-auto flex-1">
-                                <div>
+                            <div className="overflow-x-auto flex-1 w-full">
+                                <div className="min-w-[900px] w-full">
                                     <table className="w-full text-base border-separate border-spacing-0 bg-white rounded-lg">
                                         <thead className="sticky top-0 z-10 bg-card/90 backdrop-blur">
                                             <tr>
@@ -424,7 +436,7 @@ export default function DailyPage() {
                                                     "Remarks",
                                                     "Actions",
                                                 ].map((h) => (
-                                                    <th key={h} className="border-b px-6 py-3 text-left font-semibold text-gray-700">{h}</th>
+                                                    <th key={h} className="border-b px-2 sm:px-6 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">{h}</th>
                                                 ))}
                                             </tr>
                                         </thead>
@@ -443,47 +455,87 @@ export default function DailyPage() {
                                                 <>
                                                     {paginatedRecords.map((r, i) => (
                                                         <tr key={i} className="even:bg-gray-50 hover:bg-primary/10 transition">
-                                                            <td className="px-4 py-2">{r.date}</td>
-                                                            <td className="px-4 py-2">{r.inTime}</td>
-                                                            <td className="px-4 py-2">{r.outTime}</td>
-                                                            <td className="px-4 py-2">{r.workingHour}</td>
-                                                            <td className="px-4 py-2">
+                                                            <td className="px-2 sm:px-4 py-2">{r.date}</td>
+                                                            <td className="px-2 sm:px-4 py-2">{r.inTime}</td>
+                                                            <td className="px-2 sm:px-4 py-2">{r.outTime}</td>
+                                                            <td className="px-2 sm:px-4 py-2">{r.workingHour}</td>
+                                                            <td className="px-2 sm:px-4 py-2">
                                                                 <Badge variant={attendanceBadgeVariant(r.attendance)} className="capitalize px-2 py-1 text-xs font-semibold shadow-sm rounded-full">
                                                                     {r.attendance}
                                                                 </Badge>
                                                             </td>
-                                                            <td className="px-4 py-2 max-w-xs break-words">
+                                                            <td className="px-2 sm:px-4 py-2 max-w-xs break-words">
                                                                 {r.standup && r.standup.length > 15 ? (
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <button className="bg-primary/10 hover:bg-primary/20 text-primary rounded-full p-2 shadow transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary/40">
-                                                                                <Eye className="w-4 h-4" />
-                                                                            </button>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent className="max-w-xs whitespace-pre-line break-words rounded-xl shadow-lg bg-white text-gray-900 border border-gray-200 p-4">
-                                                                            <div className="font-semibold mb-1 text-primary">Standup</div>
-                                                                            <div>{r.standup}</div>
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
+                                                                    <>
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <button
+                                                                                    className="bg-primary/10 hover:bg-primary/20 text-primary rounded-full p-2 shadow transition-transform focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                                                    onClick={() => setOpenDialog({ type: 'standup', index: i })}
+                                                                                    aria-label="View Standup"
+                                                                                >
+                                                                                    <Eye className="w-4 h-4" />
+                                                                                </button>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent className="max-w-xs whitespace-pre-line break-words rounded-xl shadow-lg bg-white text-gray-900 border border-gray-200 p-4">
+                                                                                <div className="font-semibold mb-1 text-primary">Standup</div>
+                                                                                <div>{r.standup}</div>
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                        {openDialog && openDialog.type === 'standup' && openDialog.index === i && (
+                                                                            <Dialog open onOpenChange={() => setOpenDialog(null)}>
+                                                                                <DialogContent>
+                                                                                    <DialogHeader>
+                                                                                        <DialogTitle>Standup</DialogTitle>
+                                                                                        <DialogDescription>Full standup text</DialogDescription>
+                                                                                    </DialogHeader>
+                                                                                    <div className="whitespace-pre-line break-words text-gray-900">{r.standup}</div>
+                                                                                    <DialogFooter>
+                                                                                        <Button onClick={() => setOpenDialog(null)}>Close</Button>
+                                                                                    </DialogFooter>
+                                                                                </DialogContent>
+                                                                            </Dialog>
+                                                                        )}
+                                                                    </>
                                                                 ) : r.standup}
                                                             </td>
-                                                            <td className="px-4 py-2 max-w-xs break-words">
+                                                            <td className="px-2 sm:px-4 py-2 max-w-xs break-words">
                                                                 {r.report && r.report.length > 15 ? (
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <button className="bg-primary/10 hover:bg-primary/20 text-primary rounded-full p-2 shadow transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary/40">
-                                                                                <Eye className="w-4 h-4" />
-                                                                            </button>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent className="max-w-xs whitespace-pre-line break-words rounded-xl shadow-lg bg-white text-gray-900 border border-gray-200 p-4">
-                                                                            <div className="font-semibold mb-1 text-primary">Report</div>
-                                                                            <div>{r.report}</div>
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
+                                                                    <>
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <button
+                                                                                    className="bg-primary/10 hover:bg-primary/20 text-primary rounded-full p-2 shadow transition-transform focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                                                    onClick={() => setOpenDialog({ type: 'report', index: i })}
+                                                                                    aria-label="View Report"
+                                                                                >
+                                                                                    <Eye className="w-4 h-4" />
+                                                                                </button>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent className="max-w-xs whitespace-pre-line break-words rounded-xl shadow-lg bg-white text-gray-900 border border-gray-200 p-4">
+                                                                                <div className="font-semibold mb-1 text-primary">Report</div>
+                                                                                <div>{r.report}</div>
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                        {openDialog && openDialog.type === 'report' && openDialog.index === i && (
+                                                                            <Dialog open onOpenChange={() => setOpenDialog(null)}>
+                                                                                <DialogContent>
+                                                                                    <DialogHeader>
+                                                                                        <DialogTitle>Report</DialogTitle>
+                                                                                        <DialogDescription>Full report text</DialogDescription>
+                                                                                    </DialogHeader>
+                                                                                    <div className="whitespace-pre-line break-words text-gray-900">{r.report}</div>
+                                                                                    <DialogFooter>
+                                                                                        <Button onClick={() => setOpenDialog(null)}>Close</Button>
+                                                                                    </DialogFooter>
+                                                                                </DialogContent>
+                                                                            </Dialog>
+                                                                        )}
+                                                                    </>
                                                                 ) : r.report}
                                                             </td>
-                                                            <td className="px-4 py-2 max-w-xs break-words">{r.remarks}</td>
-                                                            <td className="px-4 py-2 flex gap-2 items-center">
+                                                            <td className="px-2 sm:px-4 py-2 max-w-xs break-words">{r.remarks}</td>
+                                                            <td className="px-2 sm:px-4 py-2 flex gap-2 items-center">
                                                                 <button
                                                                     className="p-2 rounded-full hover:bg-primary/10 text-primary transition"
                                                                     title="Edit"
@@ -504,7 +556,7 @@ export default function DailyPage() {
                                                     {Array.from({ length: pageSize - paginatedRecords.length }).map((_, idx) => (
                                                         <tr key={`empty-${idx}`} className="even:bg-gray-50">
                                                             {Array.from({ length: 9 }).map((_, colIdx) => (
-                                                                <td key={colIdx} className="px-4 py-2">&nbsp;</td>
+                                                                <td key={colIdx} className="px-2 sm:px-4 py-2">&nbsp;</td>
                                                             ))}
                                                         </tr>
                                                     ))}

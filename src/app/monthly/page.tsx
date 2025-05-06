@@ -154,7 +154,16 @@ export default function MonthlyPage() {
     analysis += ` You exceeded allowed leaves.`;
   }
 
-  if (user === null) return null;
+  if (user === null) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-100">
+        <div className="flex flex-col items-center gap-4">
+          <span className="inline-block animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-500 border-solid"></span>
+          <div className="text-lg text-indigo-700 font-semibold">Redirecting to login...</div>
+        </div>
+      </div>
+    );
+  }
 
   if (!month) {
     return (

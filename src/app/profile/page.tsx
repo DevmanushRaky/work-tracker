@@ -68,7 +68,16 @@ export default function ProfilePage() {
     }
   }, [user, token, setUser]);
 
-  if (user === null) return null; // Don't render anything while redirecting
+  if (user === null) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-100">
+        <div className="flex flex-col items-center gap-4">
+          <span className="inline-block animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-500 border-solid"></span>
+          <div className="text-lg text-indigo-700 font-semibold">Redirecting to login...</div>
+        </div>
+      </div>
+    );
+  }
   if (!user) return <div>Loading...</div>;
 
   // All fields from the User model (except password)
