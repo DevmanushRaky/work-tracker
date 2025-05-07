@@ -37,8 +37,8 @@ export default function Home() {
       <main className="flex-1 flex flex-col items-center justify-center px-4">
         {/* Hero Section */}
         <section className="w-full max-w-2xl text-center mt-12 mb-10">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-indigo-700 mb-4 drop-shadow-sm">Welcome to work Tracker</h1>
-          <p className="text-lg md:text-xl text-gray-700 mb-6">Your all-in-one platform for tracking attendance, performance, and progress. Get insights, stay organized, and achieve excellence every month!</p>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-indigo-700 mb-4 drop-shadow-sm">Welcome to Excellence Tracker Work Tracer</h1>
+          <p className="text-lg md:text-xl text-gray-700 mb-6">Excellence Tracker Work Tracer is your all-in-one platform for tracking attendance, performance, and work progress. Get insights, stay organized, and achieve excellence every month!</p>
           <Button
             size="lg"
             className="px-8 py-4 text-lg font-semibold shadow-md"
@@ -115,7 +115,7 @@ export default function Home() {
       </main>
       <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
       <footer className="w-full text-center py-4 text-gray-400 text-sm border-t bg-white/60 mt-auto">
-        &copy; {new Date().getFullYear()} Excellence Work Tracker. All rights reserved.
+        &copy; {new Date().getFullYear()} Excellence Tracker Work Tracer. All rights reserved.
       </footer>
     </div>
   );
