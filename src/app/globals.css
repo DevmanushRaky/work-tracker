@@ -120,3 +120,24 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Stylish custom toast for indigo/blue theme */
+.custom-toast {
+  border-radius: 14px !important;
+  box-shadow: 0 6px 32px 0 rgba(80, 80, 180, 0.10) !important;
+  font-size: 1.08rem !important;
+  padding: 1.1rem 1.5rem !important;
+  min-width: 260px !important;
+  max-width: 350px !important;
+  background: linear-gradient(90deg, #f0f4ff 0%, #e0e7ff 100%) !important;
+  color: #312e81 !important; /* Indigo-900 */
+  border-left: 6px solid #6366f1 !important; /* Indigo-500 */
+}
+
+.custom-toast--success {
+  border-left-color: #22c55e !important; /* Green-500 */
+}
+
+.custom-toast--error {
+  border-left-color: #ef4444 !important; /* Red-500 */
+}
