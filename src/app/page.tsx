@@ -54,7 +54,7 @@ export default function Home() {
         <section className="w-full max-w-4xl mb-16">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <Card className="hover:shadow-xl transition-shadow cursor-pointer group border-2 border-transparent hover:border-indigo-400">
-              <Link href="/dashboard" className="block p-6">
+              <Link href="/" className="block p-6">
                 <div className="flex items-center gap-4 mb-2">
                   <CalendarDays className="w-10 h-10 text-indigo-500 group-hover:scale-110 transition-transform" />
                   <span className="text-2xl font-bold text-indigo-700">Daily Report</span>
@@ -65,7 +65,7 @@ export default function Home() {
               </Link>
             </Card>
             <Card className="hover:shadow-xl transition-shadow cursor-pointer group border-2 border-transparent hover:border-indigo-400">
-              <Link href="/dashboard" className="block p-6">
+              <Link href="/" className="block p-6">
                 <div className="flex items-center gap-4 mb-2">
                   <BarChart2 className="w-10 h-10 text-indigo-500 group-hover:scale-110 transition-transform" />
                   <span className="text-2xl font-bold text-indigo-700">Monthly Report</span>
@@ -76,7 +76,7 @@ export default function Home() {
               </Link>
             </Card>
             <Card className="hover:shadow-xl transition-shadow cursor-pointer group border-2 border-transparent hover:border-indigo-400">
-              <Link href="/dashboard" className="block p-6">
+              <Link href="/" className="block p-6">
                 <div className="flex items-center gap-4 mb-2">
                   <ClipboardList className="w-10 h-10 text-indigo-500 group-hover:scale-110 transition-transform" />
                   <span className="text-2xl font-bold text-indigo-700">Leave Record</span>
@@ -89,7 +89,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <Card className="hover:shadow-xl transition-shadow cursor-pointer group border-2 border-transparent hover:border-indigo-400">
-              <Link href="/dashboard" className="block p-6">
+              <Link href="/" className="block p-6">
                 <div className="flex items-center gap-4 mb-2">
                   <Briefcase className="w-10 h-10 text-indigo-500 group-hover:scale-110 transition-transform" />
                   <span className="text-2xl font-bold text-indigo-700">Work Record</span>
@@ -100,7 +100,7 @@ export default function Home() {
               </Link>
             </Card>
             <Card className="hover:shadow-xl transition-shadow cursor-pointer group border-2 border-transparent hover:border-indigo-400">
-              <Link href="/dashboard" className="block p-6">
+              <Link href="/" className="block p-6">
                 <div className="flex items-center gap-4 mb-2">
                   <CheckCircle2 className="w-10 h-10 text-indigo-500 group-hover:scale-110 transition-transform" />
                   <span className="text-2xl font-bold text-indigo-700">Attendance</span>

@@ -7,8 +7,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Pencil, Trash, SlidersHorizontal } from "lucide-react";
+import { Pencil, Trash, SlidersHorizontal, Eye } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import TiptapEditor from "@/components/TiptapEditor";
 
 const attendanceBadgeVariant = (attendance: string) => {
   switch (attendance) {
@@ -52,6 +53,9 @@ export default function ViewDailyLogPanel() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showMobileFilter, setShowMobileFilter] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewContent, setViewContent] = useState<{ title: string; content: string } | null>(null);
+  const [editTab, setEditTab] = useState<"standup" | "report">("standup");
 
   // Auth redirect
   useEffect(() => {
@@ -156,6 +160,26 @@ export default function ViewDailyLogPanel() {
     } finally {
       setEditLoading(false);
     }
+  };
+
+  const handleViewContent = (title: string, content: string) => {
+    setViewContent({ title, content });
+    setViewModalOpen(true);
+  };
+
+  // Utility: Get preview (max 10 words) and valid flag
+  const getPreviewAndValid = (html: string, maxWords = 3) => {
+    if (!html) return { preview: '', valid: false };
+    // Remove HTML tags
+    let text = html.replace(/<[^>]+>/g, '');
+    // Replace multiple spaces/newlines with single space
+    text = text.replace(/\s+/g, ' ').trim();
+    // Consider valid if there's any non-empty text
+    if (!text || text.toLowerCase() === 'n/a') return { preview: '', valid: false };
+    const words = text.split(' ');
+    let preview = words.slice(0, maxWords).join(' ');
+    if (words.length > maxWords) preview += '...';
+    return { preview, valid: true };
   };
 
   if (user === null) {
@@ -301,9 +325,45 @@ export default function ViewDailyLogPanel() {
                       {r.attendance}
                     </Badge>
                   </td>
-                  <td className="px-2 sm:px-4 py-2 max-w-xs break-words">{r.standup}</td>
-                  <td className="px-2 sm:px-4 py-2 max-w-xs break-words">{r.report}</td>
-                  <td className="px-2 sm:px-4 py-2 max-w-xs break-words">{r.remarks}</td>
+                  <td className="px-2 sm:px-4 py-2 max-w-xs truncate whitespace-nowrap">
+                    {(() => {
+                      const specialAttendance = ["Leave", "Absent", "Holiday", "Weekend"];
+                      if (specialAttendance.includes(r.attendance)) return null;
+                      const { preview, valid } = getPreviewAndValid(r.standup);
+                      return valid ? (
+                        <div className="flex items-center gap-2">
+                          <span title={preview}>{preview}</span>
+                          <button
+                            className="p-1 rounded-full hover:bg-primary/10 text-primary transition"
+                            title="View full standup"
+                            onClick={() => handleViewContent("Standup", r.standup)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : null;
+                    })()}
+                  </td>
+                  <td className="px-2 sm:px-4 py-2 max-w-xs truncate whitespace-nowrap">
+                    {(() => {
+                      const specialAttendance = ["Leave", "Absent", "Holiday", "Weekend"];
+                      if (specialAttendance.includes(r.attendance)) return null;
+                      const { preview, valid } = getPreviewAndValid(r.report);
+                      return valid ? (
+                        <div className="flex items-center gap-2">
+                          <span title={preview}>{preview}</span>
+                          <button
+                            className="p-1 rounded-full hover:bg-primary/10 text-primary transition"
+                            title="View full report"
+                            onClick={() => handleViewContent("Report", r.report)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : null;
+                    })()}
+                  </td>
+                  <td className="px-2 sm:px-4 py-2 break-words">{r.remarks}</td>
                   <td className="px-2 sm:px-4 py-2 flex gap-2 items-center">
                     <button
                       className="p-2 rounded-full hover:bg-primary/10 text-primary transition"
@@ -336,66 +396,154 @@ export default function ViewDailyLogPanel() {
       )}
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="w-full max-w-[95vw] md:max-w-lg rounded-2xl p-4 md:p-6">
+        <DialogContent
+          className="w-full max-w-6xl md:max-w-7xl rounded-3xl p-2 md:p-12 overflow-y-auto max-h-[98vh] z-[9999] bg-gradient-to-br from-white via-indigo-50 to-white shadow-2xl"
+        >
           <DialogHeader>
-            <DialogTitle>Edit Daily Log</DialogTitle>
-            <DialogDescription>Update your daily log details below. All required fields must be filled.</DialogDescription>
+            <DialogTitle className="text-2xl md:text-3xl font-bold text-indigo-800">Edit Daily Log</DialogTitle>
+            <DialogDescription className="text-base md:text-lg text-gray-500">Update your daily log details below. All required fields must be filled.</DialogDescription>
           </DialogHeader>
           {editError && <div className="text-red-600 text-sm mb-2">{editError}</div>}
           {editRecord && (
-            <form className="flex flex-col gap-4" onSubmit={handleUpdate} autoComplete="off">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <label>Date</label>
-                  <Input type="date" name="date" value={editRecord.date} onChange={e => setEditRecord({ ...editRecord, date: e.target.value })} className="border rounded px-2 py-2 text-base" disabled={editLoading} />
+            <form className="flex flex-col w-full" onSubmit={handleUpdate} autoComplete="off">
+              <div className="flex flex-col md:flex-row gap-8 md:gap-12 w-full">
+                {/* Left column: Details */}
+                <div className="flex-1 flex flex-col gap-4 md:gap-6 bg-white/80 rounded-2xl p-4 md:p-8 shadow-md min-w-[320px] max-w-xl">
+                  <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-gray-700">Date</label>
+                    <Input
+                      type="date"
+                      name="date"
+                      value={editRecord.date}
+                      onChange={e => setEditRecord({ ...editRecord, date: e.target.value })}
+                      className="border rounded px-2 py-2 text-base bg-gray-50"
+                      disabled={editLoading}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-gray-700">Attendance</label>
+                    <select
+                      name="attendance"
+                      value={editRecord.attendance}
+                      onChange={e => setEditRecord({ ...editRecord, attendance: e.target.value })}
+                      className="border rounded px-2 py-2 text-base bg-gray-50"
+                      disabled={editLoading}
+                    >
+                      <option value="Present">Present</option>
+                      <option value="Absent">Absent</option>
+                      <option value="Leave">Leave</option>
+                      <option value="Holiday">Holiday</option>
+                      <option value="Weekend">Weekend</option>
+                      <option value="Work from Home">Work from Home</option>
+                      <option value="Halfday">Halfday</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-2 md:flex-row md:gap-6">
+                    <div className="flex-1 flex flex-col gap-2">
+                      <label className="font-semibold text-gray-700">In Time</label>
+                      <Input
+                        type="time"
+                        name="inTime"
+                        value={editRecord.inTime}
+                        onChange={e => setEditRecord({ ...editRecord, inTime: e.target.value })}
+                        className="border rounded px-2 py-2 text-base bg-gray-50"
+                        disabled={editLoading}
+                      />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-2">
+                      <label className="font-semibold text-gray-700">Out Time</label>
+                      <Input
+                        type="time"
+                        name="outTime"
+                        value={editRecord.outTime}
+                        onChange={e => setEditRecord({ ...editRecord, outTime: e.target.value })}
+                        className="border rounded px-2 py-2 text-base bg-gray-50"
+                        disabled={editLoading}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-gray-700">Remarks</label>
+                    <Input
+                      name="remarks"
+                      value={editRecord.remarks}
+                      onChange={e => setEditRecord({ ...editRecord, remarks: e.target.value })}
+                      className="border rounded px-2 py-2 text-base bg-gray-50"
+                      disabled={editLoading}
+                    />
+                  </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <label>Attendance</label>
-                  <select name="attendance" value={editRecord.attendance} onChange={e => setEditRecord({ ...editRecord, attendance: e.target.value })} className="border rounded px-2 py-2 text-base" disabled={editLoading}>
-                    <option value="Present">Present</option>
-                    <option value="Absent">Absent</option>
-                    <option value="Leave">Leave</option>
-                    <option value="Holiday">Holiday</option>
-                    <option value="Weekend">Weekend</option>
-                    <option value="Work from Home">Work from Home</option>
-                    <option value="Halfday">Halfday</option>
-                  </select>
-                </div>
+                {/* Right column: Standup/Report */}
+                {!["Leave", "Absent", "Holiday", "Weekend"].includes(editRecord.attendance) && (
+                  <div className="flex-1 flex flex-col gap-4 md:gap-6 bg-white/80 rounded-2xl p-4 md:p-8 shadow-md min-w-[320px] max-w-xl">
+                    <div className="flex w-full bg-gray-100 rounded overflow-hidden mb-1">
+                      <button
+                        type="button"
+                        className={`flex-1 py-2 font-semibold text-base transition ${
+                          editTab === "standup"
+                            ? "bg-white text-indigo-700 border-b-2 border-indigo-600"
+                            : "text-gray-500"
+                        }`}
+                        onClick={() => setEditTab("standup")}
+                      >
+                        Standup
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex-1 py-2 font-semibold text-base transition ${
+                          editTab === "report"
+                            ? "bg-white text-indigo-700 border-b-2 border-indigo-600"
+                            : "text-gray-500"
+                        }`}
+                        onClick={() => setEditTab("report")}
+                      >
+                        Report
+                      </button>
+                    </div>
+                    {editTab === "standup" && (
+                      <div>
+                        <TiptapEditor
+                          value={editRecord.standup || ""}
+                          onChange={(v: string) => setEditRecord({ ...editRecord, standup: v })}
+                          error={false}
+                          height={260}
+                        />
+                      </div>
+                    )}
+                    {editTab === "report" && (
+                      <div>
+                        <TiptapEditor
+                          value={editRecord.report || ""}
+                          onChange={(v: string) => setEditRecord({ ...editRecord, report: v })}
+                          error={false}
+                          height={260}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <label>In Time</label>
-                  <Input type="time" name="inTime" value={editRecord.inTime} onChange={e => {
-                    const newInTime = e.target.value;
-                    setEditRecord(prev => prev ? { ...prev, inTime: newInTime } : prev);
-                  }} className="border rounded px-2 py-2 text-base" disabled={editLoading} />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label>Out Time</label>
-                  <Input type="time" name="outTime" value={editRecord.outTime} onChange={e => {
-                    const newOutTime = e.target.value;
-                    setEditRecord(prev => prev ? { ...prev, outTime: newOutTime } : prev);
-                  }} className="border rounded px-2 py-2 text-base" disabled={editLoading} />
-                </div>
+              {/* Footer: Action buttons below both columns */}
+              <div className="flex flex-col items-center w-full mt-8">
+                <DialogFooter className="flex flex-row justify-center gap-4 w-full">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditModalOpen(false)}
+                    disabled={editLoading}
+                    className="min-w-[120px] text-base"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={editLoading}
+                    className="min-w-[120px] flex items-center justify-center bg-indigo-600 text-white hover:bg-indigo-700 shadow-md text-base"
+                  >
+                    {editLoading ? "Updating..." : "Update"}
+                  </Button>
+                </DialogFooter>
               </div>
-              <div className="flex flex-col gap-2">
-                <label>Standup</label>
-                <Input name="standup" value={editRecord.standup} onChange={e => setEditRecord({ ...editRecord, standup: e.target.value })} className="border rounded px-2 py-2 text-base" disabled={editLoading} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label>Report</label>
-                <Input name="report" value={editRecord.report} onChange={e => setEditRecord({ ...editRecord, report: e.target.value })} className="border rounded px-2 py-2 text-base" disabled={editLoading} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label>Remarks</label>
-                <Input name="remarks" value={editRecord.remarks} onChange={e => setEditRecord({ ...editRecord, remarks: e.target.value })} className="border rounded px-2 py-2 text-base" disabled={editLoading} />
-              </div>
-              <DialogFooter className="flex justify-end gap-2 mt-4">
-                <Button type="button" variant="outline" onClick={() => setEditModalOpen(false)} disabled={editLoading}>Cancel</Button>
-                <Button type="submit" disabled={editLoading} className="min-w-[120px] flex items-center justify-center bg-indigo-600 text-white hover:bg-indigo-700">
-                  {editLoading ? 'Updating...' : 'Update'}
-                </Button>
-              </DialogFooter>
             </form>
           )}
         </DialogContent>
@@ -412,6 +560,22 @@ export default function ViewDailyLogPanel() {
             <Button type="button" variant="destructive" onClick={handleDelete} disabled={editLoading}>
               {editLoading ? 'Deleting...' : 'Delete'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* View Content Modal */}
+      <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
+        <DialogContent className="max-w-2xl w-full rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{viewContent?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="modal-html-content py-4" style={{ wordBreak: 'break-word' }}>
+            {viewContent?.content ? (
+              <div dangerouslySetInnerHTML={{ __html: viewContent.content }} />
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setViewModalOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
