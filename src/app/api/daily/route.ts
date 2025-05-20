@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     
-    // Create a more flexible schema for initial validation
-    const initialSchema = z.object({
+    // Flexible schema: only require standup/report for non-special attendance
+    const baseSchema = z.object({
       date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
       attendance: AttendanceType,
       inTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'In time must be in HH:mm format').optional().nullable(),
@@ -44,87 +44,74 @@ export async function POST(req: NextRequest) {
       remarks: z.string().optional().nullable(),
       workingHour: z.string().regex(/^\d+\.\d{2}$/, 'Working hour must be in H.mm format').optional().nullable(),
     });
-
-    const parseResult = initialSchema.safeParse(body);
-    if (!parseResult.success) {
+    const bodyData = baseSchema.safeParse(body);
+    if (!bodyData.success) {
       return NextResponse.json({ 
         success: false, 
         message: "Invalid data", 
-        errors: parseResult.error.errors 
+        errors: bodyData.error.errors 
       }, { status: 400 });
     }
-
-    // Check for duplicate entry
-    const existingLog = await DailyLog.findOne({ 
-      userId, 
-      date: parseResult.data.date 
-    });
-
-    if (existingLog) {
-      return NextResponse.json({ 
-        success: false, 
-        message: "A report already exists for this date" 
-      }, { status: 400 });
-    }
-
-    // Prepare data for saving
-    const logData = {
-      ...parseResult.data,
-      userId,
-    };
-
-    // Set default values for special attendance types
-    if (['Leave', 'Holiday', 'Weekend', 'Absent'].includes(logData.attendance)) {
-      logData.inTime = logData.inTime || '00:00';
-      logData.outTime = logData.outTime || '00:00';
-      logData.standup = logData.standup || 'N/A';
-      logData.report = logData.report || 'N/A';
-      logData.workingHour = logData.workingHour || '0.00';
-    }
-
-    // Create new daily log
-    const dailyLog = new DailyLog(logData);
-
-    // Save the log
-    const savedLog = await dailyLog.save();
-
-    // Handle leave calculation if attendance is 'Leave'
-    if (logData.attendance === 'Leave') {
-      const User = (await import('@/models/User')).default;
-      const user = await User.findById(userId);
-      if (user) {
-        // Get the month from the log's date
-        const monthStr = logData.date.slice(0, 7); // 'YYYY-MM'
-        const leavesThisMonth = await DailyLog.countDocuments({ 
-          userId, 
-          attendance: 'Leave', 
-          date: { $regex: `^${monthStr}` } 
-        });
-        const allowed = user.leaveAllowedPerMonth || 0;
-        let earned = user.earnedLeave || 0;
-        if (leavesThisMonth === 0) {
-          earned += allowed;
-        } else {
-          const totalAvailable = earned + allowed;
-          if (leavesThisMonth >= totalAvailable) {
-            earned = 0;
-          } else if (leavesThisMonth <= earned) {
-            earned -= leavesThisMonth;
-          } else {
-            // Use up earned, then allowed
-            earned = 0;
-          }
-        }
-        user.earnedLeave = earned;
-        await user.save();
+    const specialAttendance = ["Leave", "Holiday", "Weekend", "Absent"];
+    const isSpecial = specialAttendance.includes(bodyData.data.attendance);
+    if (!isSpecial) {
+      // For regular attendance, require at least one of standup or report
+      if (!bodyData.data.standup && !bodyData.data.report) {
+        return NextResponse.json({
+          success: false,
+          message: "Either standup or report is required"
+        }, { status: 400 });
       }
     }
+    // Use bodyData.data as the validated data
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Report saved successfully', 
-      data: savedLog 
-    });
+    // Upsert logic: update if exists, else insert
+    const log = await DailyLog.findOne({ userId, date: bodyData.data.date });
+    if (log) {
+      // Only update provided fields
+      const validatedData = bodyData.data as Record<string, unknown>;
+      Object.keys(validatedData).forEach((key) => {
+        if ((validatedData as Record<string, unknown>)[key] !== undefined) {
+          (log as Record<string, unknown>)[key] = (validatedData as Record<string, unknown>)[key];
+        }
+      });
+      // Set default values for special attendance types
+      if (specialAttendance.includes(log.attendance)) {
+        log.inTime = log.inTime || "00:00";
+        log.outTime = log.outTime || "00:00";
+        log.standup = log.standup || " ";
+        log.report = log.report || " ";
+        log.workingHour = log.workingHour || "0.00";
+      }
+      const savedLog = await log.save();
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Report updated successfully', 
+        data: savedLog 
+      });
+    } else {
+      // Prepare data for saving
+      const logData = {
+        ...bodyData.data,
+        userId,
+      };
+      // Set default values for special attendance types
+      if (specialAttendance.includes(logData.attendance)) {
+        logData.inTime = logData.inTime || "00:00";
+        logData.outTime = logData.outTime || "00:00";
+        logData.standup = logData.standup || "N/A";
+        logData.report = logData.report || "N/A";
+        logData.workingHour = logData.workingHour || "0.00";
+      }
+      // Create new daily log
+      const dailyLog = new DailyLog(logData);
+      const savedLog = await dailyLog.save();
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Report saved successfully', 
+        data: savedLog 
+      });
+    }
   } catch (error: unknown) {
     console.error('POST /api/daily error:', error);
     let message = 'Failed to save report.';
@@ -213,7 +200,7 @@ export async function PATCH(req: NextRequest) {
 
     // Validate update fields
     const parseResult = z.object({
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
+      date: z.string().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/).optional(),
       attendance: AttendanceType.optional(),
       inTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'In time must be in HH:mm format').optional().nullable(),
       outTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Out time must be in HH:mm format').optional().nullable(),
@@ -240,31 +227,20 @@ export async function PATCH(req: NextRequest) {
       }, { status: 404 });
     }
 
-    // Check for duplicate date if date is being updated
-    if (updateFields.date && updateFields.date !== dailyLog.date) {
-      const existingLog = await DailyLog.findOne({ 
-        userId, 
-        date: updateFields.date,
-        _id: { $ne: id }
-      });
-      if (existingLog) {
-        return NextResponse.json({ 
-          success: false, 
-          message: "A report already exists for this date" 
-        }, { status: 400 });
-      }
-    }
-
-    // Update fields
+    // Only update provided fields
     const updatedFields = parseResult.data;
-    Object.assign(dailyLog, updatedFields);
-    
+    Object.keys(updatedFields).forEach((key) => {
+      if ((updatedFields as Record<string, unknown>)[key] !== undefined) {
+        (dailyLog as Record<string, unknown>)[key] = (updatedFields as Record<string, unknown>)[key];
+      }
+    });
+
     // Set default values for special attendance types
-    if (updatedFields.attendance && ['Leave', 'Holiday', 'Weekend'].includes(updatedFields.attendance)) {
+    if (updatedFields.attendance && ['Leave', 'Holiday', 'Weekend',"Absent"].includes(updatedFields.attendance)) {
       dailyLog.inTime = dailyLog.inTime || '00:00';
       dailyLog.outTime = dailyLog.outTime || '00:00';
-      dailyLog.standup = dailyLog.standup || 'N/A';
-      dailyLog.report = dailyLog.report || 'N/A';
+      dailyLog.standup = dailyLog.standup || ' ';
+      dailyLog.report = dailyLog.report || ' ';
       dailyLog.workingHour = dailyLog.workingHour || '0.00';
     }
 

@@ -1,10 +1,17 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Bold, Italic, List, ListOrdered } from 'lucide-react';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
+import ListItem from '@tiptap/extension-list-item';
 
 function getCurrentDate() {
   return new Date().toISOString().slice(0, 10);
@@ -12,6 +19,138 @@ function getCurrentDate() {
 function getCurrentTime() {
   const now = new Date();
   return now.toTimeString().slice(0, 5);
+}
+
+// Tiptap WYSIWYG Editor Component with Compact Toolbar
+function TiptapEditor({ value, onChange, error, height = 200 }: { value: string, onChange: (v: string) => void, error?: boolean, height?: number }) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      BulletList,
+      OrderedList,
+      ListItem,
+    ],
+    content: value,
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML());
+    },
+  });
+
+  // Keep editor content in sync with value prop
+  React.useEffect(() => {
+    if (editor && value !== editor.getHTML()) {
+      editor.commands.setContent(value || '<p></p>');
+    }
+    // eslint-disable-next-line
+  }, [value]);
+
+  const toolbarBtn = (isActive: boolean) =>
+    `inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 transition-colors mx-0.5
+    ${isActive ? 'bg-indigo-100 text-indigo-700 border-indigo-300' : 'bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-700'} focus:outline-none focus:ring-1 focus:ring-indigo-400`;
+
+  return (
+    <div className={`border rounded-lg bg-white ${error ? 'border-red-500' : 'border-gray-200'} shadow-sm`}>  
+      <style>{`
+        .tiptap.ProseMirror {
+          border: none !important;
+          box-shadow: none !important;
+          background: transparent !important;
+          min-height: 120px;
+          max-height: 300px;
+          overflow-y: auto;
+          padding: 0.5rem 0.75rem;
+          border-radius: 0.5rem;
+          font-size: 1rem;
+          line-height: 1.5;
+        }
+        .tiptap.ProseMirror:focus {
+          outline: none !important;
+          box-shadow: none !important;
+        }
+        .tiptap.ProseMirror ul,
+        .tiptap.ProseMirror ol {
+          padding-left: 1.5em;
+          margin: 0.25em 0 0.25em 0;
+          list-style-position: outside;
+        }
+        .tiptap.ProseMirror ul {
+          list-style-type: disc !important;
+        }
+        .tiptap.ProseMirror ol {
+          list-style-type: decimal !important;
+        }
+        .tiptap.ProseMirror li {
+          margin: 0.1em 0;
+        }
+      `}</style>
+      {editor && (
+        <div className="flex gap-1 border-b p-1 bg-gray-50 rounded-t-lg">
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            className={toolbarBtn(editor.isActive('bold'))}
+            title="Bold (Ctrl+B)"
+            aria-label="Bold"
+          >
+            <Bold className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            className={toolbarBtn(editor.isActive('italic'))}
+            title="Italic (Ctrl+I)"
+            aria-label="Italic"
+          >
+            <Italic className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!editor.isActive('bulletList')) {
+                editor.chain().focus().toggleBulletList().run();
+              } else {
+                editor.chain().focus().toggleBulletList().run();
+              }
+            }}
+            className={toolbarBtn(editor.isActive('bulletList'))}
+            title="Bullet List"
+            aria-label="Bullet List"
+          >
+            <List className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!editor.isActive('orderedList')) {
+                editor.chain().focus().toggleOrderedList().run();
+              } else {
+                editor.chain().focus().toggleOrderedList().run();
+              }
+            }}
+            className={toolbarBtn(editor.isActive('orderedList'))}
+            title="Numbered List"
+            aria-label="Numbered List"
+          >
+            <ListOrdered className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      <div className="p-2 pt-1">
+        <EditorContent
+          editor={editor}
+          className="tiptap"
+          style={{
+            minHeight: height,
+            outline: 'none',
+            border: 'none',
+            boxShadow: 'none',
+            background: 'transparent',
+            resize: 'none'
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function AddDailyLogPanel() {
@@ -28,8 +167,11 @@ export default function AddDailyLogPanel() {
     workingHour: "",
   });
   const [loading, setLoading] = useState(false);
-  const [existingDates, setExistingDates] = useState<string[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [logForDate, setLogForDate] = useState<Partial<typeof form> | null>(null);
   const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
+  const [activeTab, setActiveTab] = useState<'standup' | 'report'>('standup');
+
   const attendanceOptions = [
     "Present",
     "Absent",
@@ -39,7 +181,9 @@ export default function AddDailyLogPanel() {
     "Work from Home",
     "Halfday",
   ];
-  const formRef = useRef<HTMLFormElement>(null);
+
+  const specialAttendance = ["Leave", "Absent", "Holiday", "Weekend"];
+  const isSpecialAttendance = specialAttendance.includes(form.attendance);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -58,7 +202,7 @@ export default function AddDailyLogPanel() {
         });
         const data = await res.json();
         if (data.success && Array.isArray(data.records)) {
-          setExistingDates(data.records.map((r: { date: string }) => r.date));
+          // Removed unused existingDates
         }
       } catch {}
     }
@@ -74,6 +218,27 @@ export default function AddDailyLogPanel() {
       outTime: getCurrentTime(),
     }));
   }, []);
+
+  // Fetch log for selected date
+  useEffect(() => {
+    async function fetchLogForDate() {
+      if (!token || !form.date) return;
+      try {
+        const res = await fetch(`/api/daily?startDate=${form.date}&endDate=${form.date}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.records) && data.records.length > 0) {
+          setLogForDate(data.records[0]);
+        } else {
+          setLogForDate(null);
+        }
+      } catch {
+        setLogForDate(null);
+      }
+    }
+    fetchLogForDate();
+  }, [token, form.date]);
 
   // Calculate working hour
   function calculateWorkingHour(inTime: string, outTime: string) {
@@ -99,84 +264,98 @@ export default function AddDailyLogPanel() {
     setForm(updated);
   };
 
+  const handleEditorChange = (field: 'standup' | 'report', value: string) => {
+    setForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Unified submit handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrors({});
-
-    // Prevent duplicate date
-    if (existingDates.includes(form.date)) {
-      toast.error("A log for this date already exists.");
-      setLoading(false);
-      return;
-    }
-
-    // Validation
-    const attendanceType = form.attendance;
-    let missingField = "";
-    if (["Leave", "Holiday", "Weekend", "Absent"].includes(attendanceType)) {
+    if (isSpecialAttendance) {
+      // Only require date and attendance
       for (const field of ["date", "attendance"]) {
         if (!form[field as keyof typeof form] || (typeof form[field as keyof typeof form] === 'string' && (form[field as keyof typeof form] as string).trim() === '')) {
-          setErrors((prev) => ({ ...prev, [field]: true }));
+          setErrors((prev: { [key: string]: boolean }) => ({ ...prev, [field]: true }));
           toast.error(`${field.charAt(0).toUpperCase() + field.slice(1)} is required`);
-          missingField = field;
-          break;
+          setLoading(false);
+          return;
         }
+      }
+      // Prepare data
+      const submitData: Partial<typeof form> = {
+        date: form.date,
+        attendance: form.attendance,
+      };
+      try {
+        const res = await fetch("/api/daily", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(submitData),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || "Failed to save log");
+        toast.success("Log saved!", { className: "custom-toast custom-toast--success" });
+        setLogForDate((prev: Partial<typeof form> | null) => ({ ...prev, ...submitData }));
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : "Something went wrong";
+        toast.error(errorMsg, { className: "custom-toast custom-toast--error" });
+      } finally {
+        setLoading(false);
       }
     } else {
-      for (const field of ["date", "inTime", "outTime", "standup", "report", "attendance"]) {
+      // For regular attendance, require all fields except standup/report
+      for (const field of ["date", "attendance", "inTime", "outTime"]) {
         if (!form[field as keyof typeof form] || (typeof form[field as keyof typeof form] === 'string' && (form[field as keyof typeof form] as string).trim() === '')) {
-          setErrors((prev) => ({ ...prev, [field]: true }));
+          setErrors((prev: { [key: string]: boolean }) => ({ ...prev, [field]: true }));
           toast.error(`${field.charAt(0).toUpperCase() + field.slice(1)} is required`);
-          missingField = field;
-          break;
+          setLoading(false);
+          return;
         }
       }
-    }
-    if (missingField) {
-      setLoading(false);
-      return;
-    }
-
-    // For Leave, Holiday, Weekend, Absent - set default values
-    const submitData = { ...form };
-    if (["Leave", "Holiday", "Weekend", "Absent"].includes(attendanceType)) {
-      submitData.inTime = submitData.inTime || "00:00";
-      submitData.outTime = submitData.outTime || "00:00";
-      submitData.standup = submitData.standup || "N/A";
-      submitData.report = submitData.report || "N/A";
-      submitData.workingHour = "0.00";
-    }
-
-    try {
-      const res = await fetch("/api/daily", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(submitData),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message || "Failed to add daily log");
-      toast.success("Daily log added successfully!", { className: "custom-toast custom-toast--success" });
-      setForm({
-        date: getCurrentDate(),
-        inTime: getCurrentTime(),
-        outTime: getCurrentTime(),
-        attendance: "Present",
-        standup: "",
-        report: "",
-        remarks: "",
-        workingHour: "",
-      });
-      formRef.current?.reset();
-      // Update existingDates
-      setExistingDates(dates => [...dates, submitData.date]);
-    } catch {
-      toast.error("Something went wrong, try again later", { className: "custom-toast custom-toast--error" });
-    } finally {
-      setLoading(false);
+      // Only require at least one of standup or report
+      if (!form.standup && !form.report) {
+        setErrors(prev => ({ ...prev, standup: true, report: true }));
+        toast.error("Either Standup or Report is required");
+        setLoading(false);
+        return;
+      }
+      // Prepare data
+      const submitData: Partial<typeof form> = {
+        date: form.date,
+        attendance: form.attendance,
+        inTime: form.inTime,
+        outTime: form.outTime,
+        standup: form.standup,
+        report: form.report,
+      };
+      if (form.workingHour) submitData.workingHour = form.workingHour;
+      try {
+        const res = await fetch("/api/daily", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(submitData),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || "Failed to save log");
+        toast.success("Log saved!", { className: "custom-toast custom-toast--success" });
+        setLogForDate((prev: Partial<typeof form> | null) => ({ ...prev, ...submitData }));
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : "Something went wrong";
+        toast.error(errorMsg, { className: "custom-toast custom-toast--error" });
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -195,7 +374,7 @@ export default function AddDailyLogPanel() {
   return (
     <div className="w-full my-6 p-4 sm:p-6 md:p-8 bg-white rounded-2xl shadow-lg max-w-2xl mx-auto">
       <h2 className="text-3xl font-bold mb-6 text-indigo-800">Add Daily Log</h2>
-      <form ref={formRef} className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5" onSubmit={handleSubmit} autoComplete="off">
+      <form ref={formRef} className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5" autoComplete="off" onSubmit={handleSubmit}>
         <div>
           <label className="block text-base font-semibold mb-1 text-gray-700" htmlFor="date">Date</label>
           <Input type="date" id="date" name="date" value={form.date} onChange={handleChange} required className={`w-full text-lg px-4 py-2 border rounded-lg bg-gray-50 ${errors.date ? errorClass : ''}`} />
@@ -203,27 +382,51 @@ export default function AddDailyLogPanel() {
         <div>
           <label className="block text-base font-semibold mb-1 text-gray-700" htmlFor="attendance">Attendance</label>
           <select id="attendance" name="attendance" value={form.attendance} onChange={handleChange} className={`w-full text-lg px-4 py-2 border rounded-lg bg-gray-50 ${errors.attendance ? errorClass : ''}`}>
-            {attendanceOptions.map(opt => (
+            {attendanceOptions.map((opt: string) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
         </div>
         <div>
           <label className="block text-base font-semibold mb-1 text-gray-700" htmlFor="inTime">In Time</label>
-          <Input type="time" id="inTime" name="inTime" value={form.inTime} onChange={handleChange} className={`w-full text-lg px-4 py-2 border rounded-lg bg-gray-50 ${errors.inTime ? errorClass : ''}`} />
+          <Input type="time" id="inTime" name="inTime" value={form.inTime} onChange={handleChange} className={`w-full text-lg px-4 py-2 border rounded-lg bg-gray-50 ${errors.inTime ? errorClass : ''}`} disabled={activeTab === 'report'} />
         </div>
         <div>
           <label className="block text-base font-semibold mb-1 text-gray-700" htmlFor="outTime">Out Time</label>
-          <Input type="time" id="outTime" name="outTime" value={form.outTime} onChange={handleChange} className={`w-full text-lg px-4 py-2 border rounded-lg bg-gray-50 ${errors.outTime ? errorClass : ''}`} />
+          <Input type="time" id="outTime" name="outTime" value={form.outTime} onChange={handleChange} className={`w-full text-lg px-4 py-2 border rounded-lg bg-gray-50 ${errors.outTime ? errorClass : ''}`} disabled={activeTab === 'standup'} />
         </div>
-        <div className="sm:col-span-2">
-          <label className="block text-base font-semibold mb-1 text-gray-700" htmlFor="standup">Standup</label>
-          <Input id="standup" name="standup" value={form.standup} onChange={handleChange} className={`w-full text-lg px-4 py-2 border rounded-lg bg-gray-50 ${errors.standup ? errorClass : ''}`} />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="block text-base font-semibold mb-1 text-gray-700" htmlFor="report">Report</label>
-          <textarea id="report" name="report" value={form.report} onChange={handleChange} className={`w-full text-lg px-4 py-2 border rounded-lg bg-gray-50 min-h-[60px] ${errors.report ? errorClass : ''}`} />
-        </div>
+        {!isSpecialAttendance && (
+          <div className="sm:col-span-2">
+            <Tabs defaultValue="standup" className="w-full" onValueChange={v => setActiveTab(v as 'standup' | 'report')}>
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="standup" className={`${errors.standup ? 'border-red-500' : ''}`}>Standup</TabsTrigger>
+                <TabsTrigger value="report" className={`${errors.report ? 'border-red-500' : ''}`}>Report</TabsTrigger>
+              </TabsList>
+              <TabsContent value="standup">
+                <TiptapEditor
+                  value={form.standup}
+                  onChange={v => handleEditorChange('standup', v)}
+                  error={!!errors.standup}
+                  height={200}
+                />
+                {logForDate?.standup &&
+                  logForDate.standup.replace(/<[^>]+>/g, '').trim() !== '' &&
+                  !['<p></p>', '<ul><li></li></ul>', '<ol><li></li></ol>'].includes(logForDate.standup.trim()) && (
+                    <div className="text-green-600 text-xs mt-1">Standup already filled for this date.</div>
+                  )}
+              </TabsContent>
+              <TabsContent value="report">
+                <TiptapEditor
+                  value={form.report}
+                  onChange={v => handleEditorChange('report', v)}
+                  error={!!errors.report}
+                  height={200}
+                />
+                {logForDate?.report && <div className="text-green-600 text-xs mt-1">Report already filled for this date.</div>}
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
         <div className="sm:col-span-2">
           <label className="block text-base font-semibold mb-1 text-gray-700" htmlFor="remarks">Remarks</label>
           <Input id="remarks" name="remarks" value={form.remarks} onChange={handleChange} className="w-full text-lg px-4 py-2 border rounded-lg bg-gray-50" />
@@ -233,8 +436,16 @@ export default function AddDailyLogPanel() {
           <Input id="workingHour" name="workingHour" value={form.workingHour} className="w-full text-lg px-4 py-2 border rounded-lg bg-gray-100 cursor-not-allowed" placeholder="e.g. 8.00" readOnly disabled />
         </div>
         <div className="flex items-end">
-          <Button type="submit" disabled={loading} className="w-full sm:w-auto h-12 text-lg font-semibold bg-indigo-600 text-white hover:bg-indigo-700">
-            {loading ? "Adding..." : "Add Log"}
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full sm:w-auto h-12 text-lg font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl shadow-lg hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2 px-8 mt-2"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2"><span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span> Saving...</span>
+            ) : (
+              <span>Save Log</span>
+            )}
           </Button>
         </div>
       </form>
