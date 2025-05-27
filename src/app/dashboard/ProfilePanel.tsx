@@ -27,6 +27,7 @@ export default function ProfilePanel() {
   const [salaryError, setSalaryError] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
+  const [profileFetched, setProfileFetched] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -49,7 +50,7 @@ export default function ProfilePanel() {
 
   useEffect(() => {
     // If user is logged in but missing fields, fetch full profile
-    if (user && (!user.name || !user.phone || !user.department)) {
+    if (user && (!user.name || !user.phone || !user.department) && !profileFetched) {
       const fetchProfile = async () => {
         const res = await fetch("/api/profile", {
           headers: { Authorization: `Bearer ${token}` },
@@ -58,10 +59,11 @@ export default function ProfilePanel() {
         if (data.success && data.user) {
           setUser(data.user); // This will update the user context with all fields
         }
+        setProfileFetched(true); // Mark as fetched to prevent infinite loop
       };
       fetchProfile();
     }
-  }, [user, token, setUser]);
+  }, [user, token, setUser, profileFetched]);
 
   if (user === null) {
     return (
