@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AppProviders from "@/components/AppProviders";
 import { Toaster } from "@/components/ui/toaster";
+import { TokenExpirationDialog } from "@/components/TokenExpirationDialog"
 
 export const metadata: Metadata = {
   title: "Excellence Tracker Work Tracer",
@@ -57,6 +58,7 @@ export default function RootLayout({
           {children}
         </AppProviders>
         <Toaster />
+        <TokenExpirationDialog />
       </body>
     </html>
   );
