@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Pencil, Trash, SlidersHorizontal, Eye } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import TiptapEditor from "@/components/TiptapEditor";
+import { AuthGuard } from "@/components/AuthGuard";
 
 const attendanceBadgeVariant = (attendance: string) => {
   switch (attendance) {
@@ -35,7 +36,7 @@ type DailyReport = {
   remarks: string;
 };
 
-export default function ViewDailyLogPanel() {
+function ViewDailyLogPanelContent() {
   const { user, token } = useAuth();
   const router = useRouter();
   const [records, setRecords] = useState<DailyReport[]>([]);
@@ -580,5 +581,13 @@ export default function ViewDailyLogPanel() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ViewDailyLogPanel() {
+  return (
+    <AuthGuard>
+      <ViewDailyLogPanelContent />
+    </AuthGuard>
   );
 } 

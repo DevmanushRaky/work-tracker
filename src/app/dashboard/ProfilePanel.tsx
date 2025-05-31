@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "react-toastify";
+import { AuthGuard } from "@/components/AuthGuard";
 
 function isSalaryHistoryArray(arr: unknown): arr is { from: string; salary: number; position?: string }[] {
   return Array.isArray(arr) && arr.every(
@@ -15,7 +16,7 @@ function isSalaryHistoryArray(arr: unknown): arr is { from: string; salary: numb
   );
 }
 
-export default function ProfilePanel() {
+function ProfilePanelContent() {
   const { user, token, setUser } = useAuth();
   const router = useRouter();
   const [editField, setEditField] = useState("");
@@ -519,5 +520,13 @@ function AddSalaryForm({ token, setUser }: { token: string; setUser: React.Dispa
         {loading ? "Adding..." : "Add"}
       </Button>
     </form>
+  );
+}
+
+export default function ProfilePanel() {
+  return (
+    <AuthGuard>
+      <ProfilePanelContent />
+    </AuthGuard>
   );
 } 
