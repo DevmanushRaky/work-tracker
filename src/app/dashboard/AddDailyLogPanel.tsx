@@ -12,6 +12,7 @@ import { Bold, Italic, List, ListOrdered } from 'lucide-react';
 import BulletList from '@tiptap/extension-bullet-list';
 import OrderedList from '@tiptap/extension-ordered-list';
 import ListItem from '@tiptap/extension-list-item';
+import { AuthGuard } from "@/components/AuthGuard";
 
 function getCurrentDate() {
   return new Date().toISOString().slice(0, 10);
@@ -153,7 +154,7 @@ function TiptapEditor({ value, onChange, error, height = 200 }: { value: string,
   );
 }
 
-export default function AddDailyLogPanel() {
+function AddDailyLogPanelContent() {
   const { token, user } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState({
@@ -450,5 +451,13 @@ export default function AddDailyLogPanel() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function AddDailyLogPanel() {
+  return (
+    <AuthGuard>
+      <AddDailyLogPanelContent />
+    </AuthGuard>
   );
 } 

@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { AuthGuard } from "@/components/AuthGuard";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -35,7 +36,7 @@ function getMonth(dateStr: string) {
   return dateStr.slice(0, 7); // YYYY-MM
 }
 
-export default function AnalysisPanel() {
+function AnalysisPanelContent() {
   const { token } = useAuth();
   const [logs, setLogs] = useState<DailyReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -242,5 +243,13 @@ export default function AnalysisPanel() {
         </>
       )}
     </div>
+  );
+}
+
+export default function AnalysisPanel() {
+  return (
+    <AuthGuard>
+      <AnalysisPanelContent />
+    </AuthGuard>
   );
 } 

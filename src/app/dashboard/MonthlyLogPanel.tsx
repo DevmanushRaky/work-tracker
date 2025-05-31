@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
+import { AuthGuard } from "@/components/AuthGuard";
 
 interface DailyRecord {
   date: string;
@@ -43,7 +44,7 @@ function addMonth(month: string, delta: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export default function MonthlyLogPanel() {
+function MonthlyLogPanelContent() {
   const { user, token } = useAuth();
   const router = useRouter();
   const getCurrentMonth = () => {
@@ -92,9 +93,17 @@ export default function MonthlyLogPanel() {
     if (token && user) fetchData();
   }, [month, token, user]);
 
+  // Recalculate correct values from dailyRecords
+  const totalDays = new Date(Number(month.split('-')[0]), Number(month.split('-')[1]), 0).getDate();
+  const weekends = dailyRecords.filter(r => r.attendance === "Weekend").length;
+  const holidays = dailyRecords.filter(r => r.attendance === "Holiday").length;
+  const present = dailyRecords.filter(r => r.attendance === "Present" || r.attendance === "Work from Home").length;
+  const leaves = dailyRecords.filter(r => r.attendance === "Leave").length;
+  const absents = dailyRecords.filter(r => r.attendance === "Absent").length;
+  const workingDays = totalDays - weekends - holidays;
+  const targetHour = workingDays * 9;
+
   const leaveAllowed = summary?.leaveAllowedPerMonth || 0;
-  const workingDays = summary?.workingDays || 0;
-  const targetHour = summary?.targetHour || 0;
   const leavesTaken = summary?.leaves || 0;
   const workingHour = summary?.workingHour || 0;
   const workingHourPercent = targetHour > 0 ? Math.min(100, (workingHour / targetHour) * 100) : 0;
@@ -130,18 +139,16 @@ export default function MonthlyLogPanel() {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
       {/* Heading and Month Selector Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-2 pt-2 pb-4 gap-2 sm:gap-0">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between px-2 pt-2 pb-4 gap-2">
         <h2 className="text-3xl font-bold text-indigo-800">Monthly Log</h2>
-        <div className="w-full sm:w-auto flex flex-col sm:block mt-2 sm:mt-0">
-          <div className="flex justify-center items-center gap-2">
-            <Button variant="outline" size="icon" className="rounded-full" aria-label="Previous month" onClick={() => setMonth(addMonth(month, -1))} type="button">
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-            <Input type="month" value={month} onChange={e => setMonth(e.target.value)} className="w-[120px] h-10 text-base px-4 py-2 border rounded-lg bg-gray-50 text-center" min="2020-01" max="2100-12" />
-            <Button variant="outline" size="icon" className="rounded-full" aria-label="Next month" onClick={() => setMonth(addMonth(month, 1))} type="button">
-              <ChevronRight className="w-5 h-5" />
-            </Button>
-          </div>
+        <div className="flex justify-center items-center w-full max-w-xs md:w-auto mx-auto md:mx-0">
+          <Button variant="outline" size="icon" className="rounded-full" aria-label="Previous month" onClick={() => setMonth(addMonth(month, -1))} type="button">
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <Input type="month" value={month} onChange={e => setMonth(e.target.value)} className="mx-2 w-full min-w-[100px] max-w-[180px] h-10 text-base px-4 py-2 border rounded-lg bg-gray-50 text-center" min="2020-01" max="2100-12" />
+          <Button variant="outline" size="icon" className="rounded-full" aria-label="Next month" onClick={() => setMonth(addMonth(month, 1))} type="button">
+            <ChevronRight className="w-5 h-5" />
+          </Button>
         </div>
       </div>
       {/* Summary Grid */}
@@ -155,20 +162,12 @@ export default function MonthlyLogPanel() {
         <>
           <div className="w-full grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-4 mb-8 px-2">
             <Card className="flex flex-col items-center p-3 gap-1 text-xs">
-              <span className="text-muted-foreground">Earned Leave</span>
-              <span className="text-xl font-bold">{summary.earnedLeave ?? 0}</span>
-            </Card>
-            <Card className="flex flex-col items-center p-3 gap-1 text-xs">
               <span className="text-muted-foreground">Leaves Allowed</span>
-              <span className="text-xl font-bold">{summary.leaveAllowedPerMonth ?? 0}</span>
+              <span className="text-xl font-bold">{summary?.leaveAllowedPerMonth ?? 0}</span>
             </Card>
             <Card className="flex flex-col items-center p-3 gap-1 text-xs">
               <span className="text-muted-foreground">Leaves Taken</span>
-              <span className="text-xl font-bold">{summary.leaves ?? 0}</span>
-            </Card>
-            <Card className="flex flex-col items-center p-3 gap-1 text-xs">
-              <span className="text-muted-foreground">Balance Leave</span>
-              <span className="text-xl font-bold">{summary.balanceLeave ?? 0}</span>
+              <span className="text-xl font-bold">{leaves}</span>
             </Card>
             <Card className="flex flex-col items-center p-3 gap-1 text-xs">
               <span className="text-muted-foreground">Working Days</span>
@@ -177,25 +176,25 @@ export default function MonthlyLogPanel() {
             </Card>
             <Card className="flex flex-col items-center p-3 gap-1 text-xs">
               <span className="text-muted-foreground">Working Hours</span>
-              <span className="text-xl font-bold">{workingHour.toFixed(2)}</span>
+              <span className="text-xl font-bold">{summary?.workingHour?.toFixed(2) ?? 0}</span>
               <span className="text-[10px]">Target: {targetHour}</span>
               <Progress value={workingHourPercent} className="w-full h-1 mt-1" />
             </Card>
             <Card className="flex flex-col items-center p-3 gap-1 text-xs">
               <span className="text-muted-foreground">Absent Days</span>
-              <span className="text-xl font-bold">{summary.absent ?? 0}</span>
+              <span className="text-xl font-bold">{absents}</span>
             </Card>
             <Card className="flex flex-col items-center p-3 gap-1 text-xs">
               <span className="text-muted-foreground">Present Days</span>
-              <span className="text-xl font-bold">{summary.present ?? 0}</span>
+              <span className="text-xl font-bold">{present}</span>
             </Card>
             <Card className="flex flex-col items-center p-3 gap-1 text-xs">
               <span className="text-muted-foreground">Holidays</span>
-              <span className="text-xl font-bold">{summary.holiday ?? 0}</span>
+              <span className="text-xl font-bold">{holidays}</span>
             </Card>
             <Card className="flex flex-col items-center p-3 gap-1 text-xs">
               <span className="text-muted-foreground">Weekends</span>
-              <span className="text-xl font-bold">{summary.weekend ?? 0}</span>
+              <span className="text-xl font-bold">{weekends}</span>
             </Card>
           </div>
           {/* Analysis */}
@@ -260,5 +259,13 @@ export default function MonthlyLogPanel() {
         </>
       ) : null}
     </div>
+  );
+}
+
+export default function MonthlyLogPanel() {
+  return (
+    <AuthGuard>
+      <MonthlyLogPanelContent />
+    </AuthGuard>
   );
 } 
